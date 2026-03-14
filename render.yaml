@@ -26,9 +26,3 @@ services:
     buildCommand: |
       cd frontend && npm install && npm run build
     staticPublishPath: frontend/build
-    envVars:
-      - key: REACT_APP_API_URL
-        fromService:
-          type: web
-          name: minelawhub-backend
-          envVarKey: RENDER_EXTERNAL_URL
