@@ -1,0 +1,101 @@
+# Environment variables
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+venv/
+env/
+ENV/
+
+# PyTorch model files (large binary — train locally)
+*.pth
+*.pkl
+
+# ChromaDB stores (rebuild locally)
+embeddings/chroma_store/
+embeddings/chroma_store_v2/
+embeddings/chroma_store_v3/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnp
+.pnp.js
+
+# Frontend build
+frontend/build/
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.gemini/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs & Debug output
+*.log
+debug_output*.txt
+diagnose_output.txt
+rebuild_log.txt
+
+# Debug/Temp scripts
+debug_*.py
+diagnose*.py
+test_penalty.py
+CHECK_STATUS.py
+RUN_COMMANDS.py
+PROJECT_EXPLANATION.py
+generate_ppt.py
+
+# Old documentation (not needed in new repo)
+CODEBASE_STATUS_AND_RUN_GUIDE.txt
+COMPLETE_SUMMARY.txt
+FINAL_RUN_GUIDE.txt
+FINAL_SUMMARY.txt
+PRESENTATION_SCRIPT.txt
+PROJECT_METHODS_EXPLANATION.txt
+TEST_CASES.txt
+ZEROTH_REVIEW_PPT_CONTENT.txt
+PPT_DIAGRAM.html
+PPT_METHODOLOGY_FLOWCHART.html
+WORKFLOW_DIAGRAM.md
+workflow_diagram.png
+
+# Presentation files
+*.pptx
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
