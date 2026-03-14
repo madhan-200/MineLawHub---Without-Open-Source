@@ -27,15 +27,15 @@ class SearchEngine:
         if chroma_path is None:
             script_dir = Path(__file__).parent.parent
             chroma_path = str(script_dir / "embeddings" / "chroma_store_v3")
-            # Fallback to v2 if v3 hasn't been built yet
+            # If v3 doesn't exist, try to auto-rebuild it
+            if not os.path.exists(chroma_path):
+                print("ChromaDB store not found. Auto-rebuilding...")
+                self._auto_rebuild_chromadb(script_dir, chroma_path)
+            # Fallback to v2 if v3 still doesn't exist
             if not os.path.exists(chroma_path):
                 chroma_path = str(script_dir / "embeddings" / "chroma_store_v2")
         
-        import chromadb
-        import sys
-        print(f"DEBUG: SearchEngine using Python: {sys.executable}")
-        print(f"DEBUG: SearchEngine using ChromaDB: {chromadb.__version__}")
-        print(f"DEBUG: Connecting to DB at {chroma_path}")
+        print(f"Connecting to ChromaDB at {chroma_path}")
         
         self.chroma_path = chroma_path
         self.custom_client = CustomClient()
@@ -71,6 +71,26 @@ class SearchEngine:
         
         self._initialize_client()
     
+    def _auto_rebuild_chromadb(self, project_root: Path, target_path: str):
+        """Auto-rebuild ChromaDB embeddings from source text files."""
+        try:
+            import subprocess
+            import sys
+            rebuild_script = project_root / "embeddings" / "rebuild_transformer_embeddings.py"
+            if rebuild_script.exists():
+                print(f"Running {rebuild_script}...")
+                subprocess.run(
+                    [sys.executable, str(rebuild_script)],
+                    cwd=str(project_root),
+                    check=True,
+                    timeout=600
+                )
+                print("✓ ChromaDB rebuild complete!")
+            else:
+                print(f"✗ Rebuild script not found at {rebuild_script}")
+        except Exception as e:
+            print(f"✗ Auto-rebuild failed: {e}")
+    
     def _initialize_client(self):
         """Initialize ChromaDB client and collection."""
         try:
@@ -80,7 +100,7 @@ class SearchEngine:
             print(f"✓ Collection contains {self.collection.count()} documents")
         except Exception as e:
             print(f"✗ Error initializing ChromaDB: {str(e)}")
-            print("Please run embeddings/build_embeddings.py first to create the database.")
+            print("Please run embeddings/rebuild_transformer_embeddings.py first.")
             raise
     
     def _detect_target_source(self, query_lower: str) -> Optional[str]:

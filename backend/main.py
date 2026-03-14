@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Dict, Optional
 import uvicorn
+import os
 
 from search_engine import SearchEngine
 from custom_client import CustomClient
@@ -20,10 +21,11 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Configure CORS
+# Configure CORS — allows Render frontend domain or localhost for dev
+cors_origins = os.environ.get("CORS_ORIGINS", "http://localhost:3000").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # React frontend
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -187,16 +189,17 @@ async def get_stats():
 
 
 if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8000))
     print("\n" + "="*60)
     print("MineLawHub API Server")
     print("="*60)
-    print("\nStarting server on http://localhost:8000")
-    print("API documentation: http://localhost:8000/docs")
+    print(f"\nStarting server on http://0.0.0.0:{port}")
+    print(f"API documentation: http://localhost:{port}/docs")
     print("\nPress Ctrl+C to stop\n")
     
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=8000,
-        reload=True
+        port=port,
+        reload=(os.environ.get("RENDER") is None)
     )

@@ -27,11 +27,15 @@ venv/
 env/
 ENV/
 
-# PyTorch model files (large binary — train locally)
-*.pth
-*.pkl
+# Old model files (not used in Transformer architecture)
+backend/generator.pth
+backend/intent_classifier.pth
+backend/word2vec.pth
+backend/vocab_gen.pkl
+backend/vocab_intent.pkl
+backend/vocab_w2v.pkl
 
-# ChromaDB stores (rebuild locally)
+# ChromaDB stores (rebuilt automatically on first startup)
 embeddings/chroma_store/
 embeddings/chroma_store_v2/
 embeddings/chroma_store_v3/
@@ -78,7 +82,7 @@ RUN_COMMANDS.py
 PROJECT_EXPLANATION.py
 generate_ppt.py
 
-# Old documentation (not needed in new repo)
+# Old documentation
 CODEBASE_STATUS_AND_RUN_GUIDE.txt
 COMPLETE_SUMMARY.txt
 FINAL_RUN_GUIDE.txt

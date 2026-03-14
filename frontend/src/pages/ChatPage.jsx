@@ -4,7 +4,7 @@ import ChatWindow from '../components/ChatWindow';
 import InputBox from '../components/InputBox';
 import { useSearchParams } from 'react-router-dom';
 
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 // localStorage helpers
 const HISTORY_KEY = 'minelawhub_history';

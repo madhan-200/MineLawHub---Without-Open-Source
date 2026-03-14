@@ -1,0 +1,27 @@
+services:
+  # Backend - FastAPI + PyTorch
+  - type: web
+    name: minelawhub-backend
+    runtime: python
+    buildCommand: |
+      cd backend && pip install -r ../requirements.txt
+    startCommand: |
+      cd backend && gunicorn main:app --workers 1 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT --timeout 120
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.6"
+      - key: CORS_ORIGINS
+        generateFrom: frontend-url
+      - key: RENDER
+        value: "true"
+
+  # Frontend - React Static Site
+  - type: web
+    name: minelawhub-frontend
+    runtime: static
+    buildCommand: |
+      cd frontend && npm install && npm run build
+    staticPublishPath: frontend/build
+    envVars:
+      - key: REACT_APP_API_URL
+        generateFrom: backend-url
