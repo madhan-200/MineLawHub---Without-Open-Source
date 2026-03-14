@@ -12,6 +12,6 @@ services:
       - key: OMP_NUM_THREADS
         value: "1"
       - key: CORS_ORIGINS
-        value: "https://minelawhub.netlify.app,https://minelawhub-frontend.onrender.com,http://localhost:3000"
+        value: "https://minelaw.netlify.app,http://localhost:3000"
       - key: RENDER
         value: "true"
