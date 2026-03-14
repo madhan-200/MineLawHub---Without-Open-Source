@@ -111,6 +111,7 @@ class CustomClient:
         Classify query intent using Transformer-based classifier.
         Returns: 'static_law' or 'general_query'
         """
+        self._ensure_models_loaded()
         query_clean = query.lower().strip()
         
         # Quick heuristic for obvious greetings (saves model inference)
