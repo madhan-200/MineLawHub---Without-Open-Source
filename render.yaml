@@ -22,7 +22,6 @@ services:
   # Frontend - React Static Site
   - type: web
     name: minelawhub-frontend
-    plan: free
     runtime: static
     buildCommand: |
       cd frontend && npm install && npm run build
