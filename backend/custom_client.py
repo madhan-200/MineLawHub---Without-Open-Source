@@ -324,16 +324,20 @@ class CustomClient:
             if range_match:
                 range_start = range_match.group(1)
                 range_end = range_match.group(2)
-                start_base = int(re.match(r'\d+', range_start).group())
-                end_num = int(re.match(r'\d+', range_end).group())
-                has_suffix = re.search(r'[A-Z]', range_start)
-                range_begin = start_base + 1 if has_suffix else start_base
-                for n in range(range_begin, end_num + 1):
-                    s = str(n)
-                    if s not in fact_sections:
-                        fact_sections.append(s)
-                if range_start not in fact_sections:
-                    fact_sections.append(range_start)
+                start_match = re.match(r'\d+', range_start)
+                end_match = re.match(r'\d+', range_end)
+                
+                if start_match and end_match:
+                    start_base = int(start_match.group())
+                    end_num = int(end_match.group())
+                    has_suffix = re.search(r'[A-Z]', range_start)
+                    range_begin = start_base + 1 if has_suffix else start_base
+                    for n in range(range_begin, end_num + 1):
+                        s = str(n)
+                        if s not in fact_sections:
+                            fact_sections.append(s)
+                    if range_start not in fact_sections:
+                        fact_sections.append(range_start)
 
             if fact_sections:
                 targeted_chunks = []
@@ -430,6 +434,8 @@ class CustomClient:
             if injected_fact:
                 answer = injected_fact
             else:
+                if not context_chunks:
+                    return {"answer": "I'm sorry, I couldn't find a specific section...", "citations": [], "status": "success"}
                 best_chunk = context_chunks[0]
                 best_text = self.clean_text(best_chunk.get('text', ''))
                 best_source = best_chunk.get('metadata', {}).get('source_file', 'Source')
