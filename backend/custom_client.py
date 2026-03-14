@@ -48,12 +48,12 @@ class CustomClient:
         # 1. Load BPE Tokenizer (small, safe to load now)
         self.tokenizer = BPETokenizer.load(TOKENIZER_PATH)
         
-        # Initialize models as None for lazy loading
-        self.encoder = None
-        self.intent_model = None
-        self.reranker = None
-        self.decoder = None
-        self.models_loaded = False
+        # Initialize models as None with Type Hints for IDE/LSP
+        self.encoder: Optional[nn.Module] = None
+        self.intent_model: Optional[nn.Module] = None
+        self.reranker: Optional[nn.Module] = None
+        self.decoder: Optional[nn.Module] = None
+        self.models_loaded: bool = False
 
     def _ensure_models_loaded(self):
         """Lazy load models only when needed to save RAM on startup."""
@@ -147,9 +147,9 @@ class CustomClient:
         if not chunks:
             return chunks
         
-        scored_chunks = []
+        scored_chunks: List[Dict] = []
         for chunk in chunks:
-            chunk_text = chunk.get('text', '')[:200]
+            chunk_text = str(chunk.get('text', ''))[:200]
             pair_ids = self.tokenizer.encode_pair(query, chunk_text)
             pair_ids = pair_ids[:MAX_ENCODE_LEN]
             
@@ -163,12 +163,12 @@ class CustomClient:
             
             with torch.no_grad():
                 self._ensure_models_loaded()
-                score = self.reranker(input_ids, attn_mask).item()
-            
-            scored_chunks.append({**chunk, 'rerank_score': score})
+                if self.reranker is not None:
+                    score = self.reranker(input_ids, attn_mask).item()
+                    scored_chunks.append({**chunk, 'rerank_score': score})
         
         # Sort by reranker score
-        scored_chunks.sort(key=lambda x: x['rerank_score'], reverse=True)
+        scored_chunks.sort(key=lambda x: x.get('rerank_score', 0), reverse=True)
         return scored_chunks[:top_k]
     
     # ─── Text Cleaning ────────────────────────────────────────

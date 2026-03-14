@@ -40,7 +40,8 @@ def get_search_engine():
     """Get or initialize search engine."""
     global search_engine
     if search_engine is None:
-        search_engine = SearchEngine()
+        client = get_custom_client()
+        search_engine = SearchEngine(custom_client=client)
     return search_engine
 
 
@@ -159,10 +160,10 @@ async def chat(request: ChatRequest):
         
         # Step 4: Return response
         return ChatResponse(
-            answer=result['answer'],
+            answer=str(result['answer']),
             citations=result['citations'],
             used_chunks=context_chunks,
-            intent=intent
+            intent=str(intent)
         )
         
     except Exception as e:

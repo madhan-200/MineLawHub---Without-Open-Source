@@ -17,12 +17,13 @@ class SearchEngine:
     Encapsulates ChromaDB retrieval logic for hybrid search.
     """
     
-    def __init__(self, chroma_path: Optional[str] = None):
+    def __init__(self, chroma_path: Optional[str] = None, custom_client=None):
         """
         Initialize the search engine.
         
         Args:
             chroma_path: Path to ChromaDB storage (optional)
+            custom_client: Shared CustomClient instance (avoids doubling memory)
         """
         if chroma_path is None:
             script_dir = Path(__file__).parent.parent
@@ -38,7 +39,8 @@ class SearchEngine:
         print(f"Connecting to ChromaDB at {chroma_path}")
         
         self.chroma_path = chroma_path
-        self.custom_client = CustomClient()
+        # Use shared client if provided, otherwise create new (for standalone usage)
+        self.custom_client = custom_client if custom_client is not None else CustomClient()
         self.client = None
         self.collection = None
         
