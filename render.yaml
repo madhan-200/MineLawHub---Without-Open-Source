@@ -11,7 +11,10 @@ services:
       - key: PYTHON_VERSION
         value: "3.11.6"
       - key: CORS_ORIGINS
-        generateFrom: frontend-url
+        fromService:
+          type: web
+          name: minelawhub-frontend
+          envVarKey: RENDER_EXTERNAL_URL
       - key: RENDER
         value: "true"
 
@@ -24,4 +27,7 @@ services:
     staticPublishPath: frontend/build
     envVars:
       - key: REACT_APP_API_URL
-        generateFrom: backend-url
+        fromService:
+          type: web
+          name: minelawhub-backend
+          envVarKey: RENDER_EXTERNAL_URL
