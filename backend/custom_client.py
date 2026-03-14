@@ -44,39 +44,55 @@ class CustomClient:
     """
     
     def __init__(self):
-        print("Loading Custom Transformer Models (2025 Architecture)...")
-        
-        # 1. Load BPE Tokenizer
+        print("Initializing CustomClient (Lazy Loading enabled)...")
+        # 1. Load BPE Tokenizer (small, safe to load now)
         self.tokenizer = BPETokenizer.load(TOKENIZER_PATH)
+        
+        # Initialize models as None for lazy loading
+        self.encoder = None
+        self.intent_model = None
+        self.reranker = None
+        self.decoder = None
+        self.models_loaded = False
+
+    def _ensure_models_loaded(self):
+        """Lazy load models only when needed to save RAM on startup."""
+        if self.models_loaded:
+            return
+        
+        print("Loading Custom Transformer Models (2025 Architecture)...")
+        # Limit PyTorch to 1 thread to save memory/CPU spikes on free tier
+        torch.set_num_threads(1)
         
         # 2. Load Transformer Encoder
         self.encoder = create_encoder(self.tokenizer.vocab_size)
         if os.path.exists(ENCODER_PATH):
-            self.encoder.load_state_dict(torch.load(ENCODER_PATH, weights_only=True))
+            self.encoder.load_state_dict(torch.load(ENCODER_PATH, map_location='cpu', weights_only=True))
         self.encoder.eval()
-        print(f"  ✓ Transformer Encoder loaded ({sum(p.numel() for p in self.encoder.parameters()):,} params)")
+        print(f"  ✓ Transformer Encoder loaded")
         
         # 3. Load Intent Classifier
         self.intent_model = create_intent_classifier(self.tokenizer.vocab_size)
         if os.path.exists(INTENT_PATH):
-            self.intent_model.load_state_dict(torch.load(INTENT_PATH, weights_only=True))
+            self.intent_model.load_state_dict(torch.load(INTENT_PATH, map_location='cpu', weights_only=True))
         self.intent_model.eval()
-        print(f"  ✓ Intent Classifier loaded ({sum(p.numel() for p in self.intent_model.parameters()):,} params)")
+        print(f"  ✓ Intent Classifier loaded")
         
         # 4. Load Cross-Encoder Reranker
         self.reranker = create_reranker(self.tokenizer.vocab_size)
         if os.path.exists(RERANKER_PATH):
-            self.reranker.load_state_dict(torch.load(RERANKER_PATH, weights_only=True))
+            self.reranker.load_state_dict(torch.load(RERANKER_PATH, map_location='cpu', weights_only=True))
         self.reranker.eval()
-        print(f"  ✓ Cross-Encoder Reranker loaded ({sum(p.numel() for p in self.reranker.parameters()):,} params)")
+        print(f"  ✓ Cross-Encoder Reranker loaded")
         
         # 5. Load Transformer Decoder
         self.decoder = create_decoder(self.tokenizer.vocab_size)
         if os.path.exists(DECODER_PATH):
-            self.decoder.load_state_dict(torch.load(DECODER_PATH, weights_only=True))
+            self.decoder.load_state_dict(torch.load(DECODER_PATH, map_location='cpu', weights_only=True))
         self.decoder.eval()
-        print(f"  ✓ Transformer Decoder loaded ({sum(p.numel() for p in self.decoder.parameters()):,} params)")
+        print(f"  ✓ Transformer Decoder loaded")
         
+        self.models_loaded = True
         print("✓ All custom Transformer models loaded successfully")
     
     # ─── Tokenization Helpers ─────────────────────────────────
@@ -115,6 +131,7 @@ class CustomClient:
         Generate 256-dim context-aware embedding using Transformer Encoder.
         Replaces old Word2Vec 128-dim embeddings.
         """
+        self._ensure_models_loaded()
         input_ids, attn_mask = self._tokenize(text)
         with torch.no_grad():
             embedding = self.encoder.get_embedding(input_ids, attn_mask)
@@ -144,6 +161,7 @@ class CustomClient:
             attn_mask = torch.tensor([mask], dtype=torch.float)
             
             with torch.no_grad():
+                self._ensure_models_loaded()
                 score = self.reranker(input_ids, attn_mask).item()
             
             scored_chunks.append({**chunk, 'rerank_score': score})
@@ -171,6 +189,7 @@ class CustomClient:
         ctx_ids, ctx_mask = self._tokenize(combined)
         
         with torch.no_grad():
+            self._ensure_models_loaded()
             memory = self.encoder(ctx_ids, ctx_mask)
             
             # Generate with decoder
