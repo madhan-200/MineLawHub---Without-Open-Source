@@ -44,56 +44,62 @@ class CustomClient:
     """
     
     def __init__(self):
-        print("Initializing CustomClient (Lazy Loading enabled)...")
+        print("Initializing CustomClient (Memory-Optimized Loading)...")
         # 1. Load BPE Tokenizer (small, safe to load now)
         self.tokenizer = BPETokenizer.load(TOKENIZER_PATH)
         
-        # Initialize models as None with Type Hints for IDE/LSP
+        # Initialize models as None — loaded on demand, freed after use
         self.encoder: Optional[nn.Module] = None
         self.intent_model: Optional[nn.Module] = None
         self.reranker: Optional[nn.Module] = None
         self.decoder: Optional[nn.Module] = None
-        self.models_loaded: bool = False
-
-    def _ensure_models_loaded(self):
-        """Lazy load models only when needed to save RAM on startup."""
-        if self.models_loaded:
-            return
         
-        print("Loading Custom Transformer Models (2025 Architecture)...")
-        # Limit PyTorch to 1 thread to save memory/CPU spikes on free tier
+        # Limit PyTorch to 1 thread to save memory/CPU on free tier
         torch.set_num_threads(1)
-        
-        # 2. Load Transformer Encoder
-        self.encoder = create_encoder(self.tokenizer.vocab_size)
-        if os.path.exists(ENCODER_PATH):
-            self.encoder.load_state_dict(torch.load(ENCODER_PATH, map_location='cpu', weights_only=True))
-        self.encoder.eval()
-        print(f"  ✓ Transformer Encoder loaded")
-        
-        # 3. Load Intent Classifier
-        self.intent_model = create_intent_classifier(self.tokenizer.vocab_size)
-        if os.path.exists(INTENT_PATH):
-            self.intent_model.load_state_dict(torch.load(INTENT_PATH, map_location='cpu', weights_only=True))
-        self.intent_model.eval()
-        print(f"  ✓ Intent Classifier loaded")
-        
-        # 4. Load Cross-Encoder Reranker
-        self.reranker = create_reranker(self.tokenizer.vocab_size)
-        if os.path.exists(RERANKER_PATH):
-            self.reranker.load_state_dict(torch.load(RERANKER_PATH, map_location='cpu', weights_only=True))
-        self.reranker.eval()
-        print(f"  ✓ Cross-Encoder Reranker loaded")
-        
-        # 5. Load Transformer Decoder
-        self.decoder = create_decoder(self.tokenizer.vocab_size)
-        if os.path.exists(DECODER_PATH):
-            self.decoder.load_state_dict(torch.load(DECODER_PATH, map_location='cpu', weights_only=True))
-        self.decoder.eval()
-        print(f"  ✓ Transformer Decoder loaded")
-        
-        self.models_loaded = True
-        print("✓ All custom Transformer models loaded successfully")
+
+    def _load_model(self, name: str):
+        """Load a single model into memory on demand."""
+        if name == 'intent' and self.intent_model is None:
+            self.intent_model = create_intent_classifier(self.tokenizer.vocab_size)
+            if os.path.exists(INTENT_PATH):
+                self.intent_model.load_state_dict(torch.load(INTENT_PATH, map_location='cpu', weights_only=True))
+            self.intent_model.eval()
+            print(f"  ✓ Intent Classifier loaded")
+        elif name == 'encoder' and self.encoder is None:
+            self.encoder = create_encoder(self.tokenizer.vocab_size)
+            if os.path.exists(ENCODER_PATH):
+                self.encoder.load_state_dict(torch.load(ENCODER_PATH, map_location='cpu', weights_only=True))
+            self.encoder.eval()
+            print(f"  ✓ Transformer Encoder loaded")
+        elif name == 'reranker' and self.reranker is None:
+            self.reranker = create_reranker(self.tokenizer.vocab_size)
+            if os.path.exists(RERANKER_PATH):
+                self.reranker.load_state_dict(torch.load(RERANKER_PATH, map_location='cpu', weights_only=True))
+            self.reranker.eval()
+            print(f"  ✓ Cross-Encoder Reranker loaded")
+        elif name == 'decoder' and self.decoder is None:
+            self.decoder = create_decoder(self.tokenizer.vocab_size)
+            if os.path.exists(DECODER_PATH):
+                self.decoder.load_state_dict(torch.load(DECODER_PATH, map_location='cpu', weights_only=True))
+            self.decoder.eval()
+            print(f"  ✓ Transformer Decoder loaded")
+
+    def _unload_model(self, name: str):
+        """Remove a model from memory to free RAM."""
+        import gc
+        if name == 'intent' and self.intent_model is not None:
+            del self.intent_model
+            self.intent_model = None
+        elif name == 'encoder' and self.encoder is not None:
+            del self.encoder
+            self.encoder = None
+        elif name == 'reranker' and self.reranker is not None:
+            del self.reranker
+            self.reranker = None
+        elif name == 'decoder' and self.decoder is not None:
+            del self.decoder
+            self.decoder = None
+        gc.collect()
     
     # ─── Tokenization Helpers ─────────────────────────────────
     def _tokenize(self, text: str, max_len: int = MAX_ENCODE_LEN):
@@ -111,7 +117,6 @@ class CustomClient:
         Classify query intent using Transformer-based classifier.
         Returns: 'static_law' or 'general_query'
         """
-        self._ensure_models_loaded()
         query_clean = query.lower().strip()
         
         # Quick heuristic for obvious greetings (saves model inference)
@@ -119,12 +124,15 @@ class CustomClient:
         if any(g in query_clean for g in greetings) or len(query_clean.split()) < 2:
             return "general_query"
         
-        input_ids, attn_mask = self._tokenize(query, max_len=64)
-        with torch.no_grad():
-            logits = self.intent_model(input_ids, attn_mask)
-            prediction = torch.argmax(logits, dim=1).item()
-        
-        return "general_query" if prediction == 1 else "static_law"
+        try:
+            self._load_model('intent')
+            input_ids, attn_mask = self._tokenize(query, max_len=64)
+            with torch.no_grad():
+                logits = self.intent_model(input_ids, attn_mask)
+                prediction = torch.argmax(logits, dim=1).item()
+            return "general_query" if prediction == 1 else "static_law"
+        finally:
+            self._unload_model('intent')
     
     # ─── Embedding Generation ─────────────────────────────────
     def get_embedding(self, text: str) -> List[float]:
@@ -132,11 +140,14 @@ class CustomClient:
         Generate 256-dim context-aware embedding using Transformer Encoder.
         Replaces old Word2Vec 128-dim embeddings.
         """
-        self._ensure_models_loaded()
-        input_ids, attn_mask = self._tokenize(text)
-        with torch.no_grad():
-            embedding = self.encoder.get_embedding(input_ids, attn_mask)
-        return embedding.squeeze(0).tolist()
+        try:
+            self._load_model('encoder')
+            input_ids, attn_mask = self._tokenize(text)
+            with torch.no_grad():
+                embedding = self.encoder.get_embedding(input_ids, attn_mask)
+            return embedding.squeeze(0).tolist()
+        finally:
+            self._unload_model('encoder')
     
     # ─── Reranking ────────────────────────────────────────────
     def rerank_chunks(self, query: str, chunks: List[Dict], top_k: int = 5) -> List[Dict]:
@@ -147,29 +158,32 @@ class CustomClient:
         if not chunks:
             return chunks
         
-        scored_chunks: List[Dict] = []
-        for chunk in chunks:
-            chunk_text = str(chunk.get('text', ''))[:200]
-            pair_ids = self.tokenizer.encode_pair(query, chunk_text)
-            pair_ids = pair_ids[:MAX_ENCODE_LEN]
+        try:
+            self._load_model('reranker')
+            scored_chunks: List[Dict] = []
+            for chunk in chunks:
+                chunk_text = str(chunk.get('text', ''))[:200]
+                pair_ids = self.tokenizer.encode_pair(query, chunk_text)
+                pair_ids = pair_ids[:MAX_ENCODE_LEN]
+                
+                # Pad
+                pad_len = MAX_ENCODE_LEN - len(pair_ids)
+                mask = [1] * len(pair_ids) + [0] * pad_len
+                pair_ids = pair_ids + [self.tokenizer.pad_id] * pad_len
+                
+                input_ids = torch.tensor([pair_ids], dtype=torch.long)
+                attn_mask = torch.tensor([mask], dtype=torch.float)
+                
+                with torch.no_grad():
+                    if self.reranker is not None:
+                        score = self.reranker(input_ids, attn_mask).item()
+                        scored_chunks.append({**chunk, 'rerank_score': score})
             
-            # Pad
-            pad_len = MAX_ENCODE_LEN - len(pair_ids)
-            mask = [1] * len(pair_ids) + [0] * pad_len
-            pair_ids = pair_ids + [self.tokenizer.pad_id] * pad_len
-            
-            input_ids = torch.tensor([pair_ids], dtype=torch.long)
-            attn_mask = torch.tensor([mask], dtype=torch.float)
-            
-            with torch.no_grad():
-                self._ensure_models_loaded()
-                if self.reranker is not None:
-                    score = self.reranker(input_ids, attn_mask).item()
-                    scored_chunks.append({**chunk, 'rerank_score': score})
-        
-        # Sort by reranker score
-        scored_chunks.sort(key=lambda x: x.get('rerank_score', 0), reverse=True)
-        return scored_chunks[:top_k]
+            # Sort by reranker score
+            scored_chunks.sort(key=lambda x: x.get('rerank_score', 0), reverse=True)
+            return scored_chunks[:top_k]
+        finally:
+            self._unload_model('reranker')
     
     # ─── Text Cleaning ────────────────────────────────────────
     def clean_text(self, text: str) -> str:
@@ -185,27 +199,34 @@ class CustomClient:
         Generate answer using Transformer Decoder with cross-attention.
         The decoder attends to encoded context while generating tokens.
         """
-        # Encode context with Transformer Encoder
-        combined = f"{query} {context[:300]}"
-        ctx_ids, ctx_mask = self._tokenize(combined)
-        
-        with torch.no_grad():
-            self._ensure_models_loaded()
-            memory = self.encoder(ctx_ids, ctx_mask)
+        try:
+            # These two models must coexist briefly (~130 MB combined)
+            self._load_model('encoder')
+            self._load_model('decoder')
             
-            # Generate with decoder
-            generated_ids = self.decoder.generate(
-                memory=memory,
-                sos_id=self.tokenizer.sos_id,
-                eos_id=self.tokenizer.eos_id,
-                max_len=MAX_GENERATE_LEN,
-                temperature=0.7,
-                top_k=50
-            )
-        
-        # Decode tokens back to text
-        answer = self.tokenizer.decode(generated_ids, skip_special=True)
-        return answer.strip()
+            # Encode context with Transformer Encoder
+            combined = f"{query} {context[:300]}"
+            ctx_ids, ctx_mask = self._tokenize(combined)
+            
+            with torch.no_grad():
+                memory = self.encoder(ctx_ids, ctx_mask)
+                
+                # Generate with decoder
+                generated_ids = self.decoder.generate(
+                    memory=memory,
+                    sos_id=self.tokenizer.sos_id,
+                    eos_id=self.tokenizer.eos_id,
+                    max_len=MAX_GENERATE_LEN,
+                    temperature=0.7,
+                    top_k=50
+                )
+            
+            # Decode tokens back to text
+            answer = self.tokenizer.decode(generated_ids, skip_special=True)
+            return answer.strip()
+        finally:
+            self._unload_model('encoder')
+            self._unload_model('decoder')
     
     # ─── Main Answer Pipeline ─────────────────────────────────
     def generate_answer(self, query: str, context_chunks: Optional[List[Dict]] = None, search_engine=None) -> Dict:
